@@ -15,6 +15,6 @@ export default async function Add(req, res) {
 
     return res.status(200).json({ message: "Friend request sent!" });
   } catch (error) {
-    return res.status(500).json({ message: "Error while adding friend" });
+    return res.status(500).json({ message: "Error while adding friend", error: error.message });
   }
 }
