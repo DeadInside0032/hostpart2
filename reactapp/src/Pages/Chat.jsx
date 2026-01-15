@@ -146,6 +146,17 @@ export default function Chat({ setToastData }) {
       setIsMobileView(window.innerWidth <= 768);
     };
 
+    // Lekérjük a barátokat
+    fetch("/api/friends", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: currentUser.username }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        setFriends(data.friends || []);
+      });
+
     fetch("/api/friendrequests", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -154,13 +165,10 @@ export default function Chat({ setToastData }) {
       }),
     }).then(async (responseJSON) => {
       const response = await responseJSON.json();
-      console.log(response);
       if (response.requester.length > 0) {
-        //console.log("van friend request");
         setFriendRequests(true);
         setFriendRequestUsers(response.requester);
       } else {
-        //console.log("nincs friend request");
         setFriendRequests(false);
       }
     });
@@ -205,32 +213,44 @@ export default function Chat({ setToastData }) {
           </h1>
 
           {!isMobileView && (
-            <div className="flex">
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setshowOtherUsers(true);
-                  handleSearch("");
-                }}
-                style={{
-                  marginRight: "10px",
-                  color: "gray",
-                  borderColor: "gray",
-                }}
-              >
-                Others
-              </Button>
+            <div className="flex" style={{ flexDirection: "column", alignItems: "center" }}>
+              <div>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setshowOtherUsers(true);
+                    handleSearch("");
+                  }}
+                  style={{
+                    marginRight: "10px",
+                    color: "gray",
+                    borderColor: "gray",
+                  }}
+                >
+                  Others
+                </Button>
 
-              <Button
-                variant="outlined"
-                style={{ color: "gray", borderColor: "gray" }}
-                onClick={() => {
-                  localStorage.removeItem("user");
-                  navigate("/");
-                }}
-              >
-                Logout
-              </Button>
+                <Button
+                  variant="outlined"
+                  style={{ color: "gray", borderColor: "gray" }}
+                  onClick={() => {
+                    localStorage.removeItem("user");
+                    navigate("/");
+                  }}
+                >
+                  Logout
+                </Button>
+              </div>
+              {friends.length > 0 && (
+                <div style={{ marginTop: "20px" }}>
+                  <h3 style={{ fontWeight: "bold" }}>Your friends:</h3>
+                  <ul>
+                    {friends.map((friend, idx) => (
+                      <li key={idx}>{friend}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
