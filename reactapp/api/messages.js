@@ -23,6 +23,13 @@ export default async function handler(req, res) {
         `SELECT * FROM messages WHERE (sender = $1 AND receiver = $2) OR (sender = $2 AND receiver = $1) ORDER BY sent_at ASC`,
         [user1, user2]
       );
+      // Olvasatlan üzeneteket olvasottra állítjuk (amiket user2 küldött user1-nek)
+      if (user1 && user2) {
+        await pool.query(
+          `UPDATE messages SET read = TRUE WHERE sender = $2 AND receiver = $1 AND read = FALSE`,
+          [user1, user2]
+        );
+      }
       return res.status(200).json({ messages: result.rows });
     } catch (error) {
       return res.status(500).json({ message: "Error fetching messages", error: error.message });

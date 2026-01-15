@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Badge from "@mui/material/Badge";
 import { useNavigate } from "react-router-dom";
 
 import TextField from "@mui/material/TextField";
@@ -18,7 +19,30 @@ export default function Chat({ setToastData }) {
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [unreadMessages, setUnreadMessages] = useState({});
   const messagesEndRef = useRef(null);
+  // Olvasatlan üzenetek lekérdezése 5 másodpercenként
+  useEffect(() => {
+    let interval = setInterval(() => {
+      fetch(`/api/messages?user1=${currentUser.username}`)
+        .then(async (res) => {
+          const data = await res.json();
+          // Számoljuk, hogy kitől van olvasatlan üzenet (amit nem én küldtem, és nem az aktív chat)
+          const unread = {};
+          (data.messages || []).forEach(msg => {
+            if (
+              msg.receiver === currentUser.username &&
+              msg.sender !== activeChat &&
+              !msg.read
+            ) {
+              unread[msg.sender] = (unread[msg.sender] || 0) + 1;
+            }
+          });
+          setUnreadMessages(unread);
+        });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [currentUser.username, activeChat]);
 
   const currentUser = JSON.parse(localStorage.getItem("user"));
 
@@ -397,7 +421,14 @@ export default function Chat({ setToastData }) {
                   alignItems: "center",
                 }}
               >
-                <span>{friend}</span>
+                <Badge
+                  color="error"
+                  variant="dot"
+                  invisible={!unreadMessages[friend]}
+                  anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                >
+                  <span>{friend}</span>
+                </Badge>
                 <Button
                   variant="text"
                   style={{ color: activeChat === friend ? "#1976d2" : "gray", fontWeight: activeChat === friend ? "bold" : "normal" }}
@@ -461,9 +492,16 @@ export default function Chat({ setToastData }) {
                         maxWidth: "60%",
                         wordBreak: "break-word",
                         fontSize: "16px",
+                        display: "inline-flex",
+                        alignItems: "center"
                       }}
                     >
                       {msg.content}
+                      {msg.sender === currentUser.username && (
+                        <span style={{ marginLeft: 8, fontSize: 14 }}>
+                          {msg.read ? "✔️" : ""}
+                        </span>
+                      )}
                     </span>
                     <span style={{ fontSize: "10px", color: "#888", marginTop: "2px" }}>
                       {msg.sender === currentUser.username ? "You" : msg.sender} • {msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ""}
