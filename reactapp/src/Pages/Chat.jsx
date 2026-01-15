@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import TextField from "@mui/material/TextField";
@@ -15,6 +15,10 @@ export default function Chat({ setToastData }) {
   const [friendRequests, setFriendRequests] = useState(false);
   const [friendRequestUsers, setFriendRequestUsers] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [activeChat, setActiveChat] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const messagesEndRef = useRef(null);
 
   const currentUser = JSON.parse(localStorage.getItem("user"));
 
@@ -178,6 +182,49 @@ export default function Chat({ setToastData }) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Üzenetek lekérése, ha activeChat változik
+  useEffect(() => {
+    if (activeChat) {
+      fetch(`/api/messages?user1=${currentUser.username}&user2=${activeChat}`)
+        .then(async (res) => {
+          const data = await res.json();
+          setMessages(data.messages || []);
+        });
+    }
+  }, [activeChat]);
+
+  // Scroll to bottom, ha messages változik
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !activeChat) return;
+    const body = {
+      sender: currentUser.username,
+      receiver: activeChat,
+      content: newMessage.trim(),
+    };
+    const res = await fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      setNewMessage("");
+      // Frissítjük az üzeneteket
+      fetch(`/api/messages?user1=${currentUser.username}&user2=${activeChat}`)
+        .then(async (res) => {
+          const data = await res.json();
+          setMessages(data.messages || []);
+        });
+    } else {
+      setToastData({ open: true, message: "Error sending message", severity: "error" });
+    }
+  };
+
   return (
     <div
       style={{
@@ -187,6 +234,7 @@ export default function Chat({ setToastData }) {
         overflow: "hidden",
       }}
     >
+      {/* BAL OLDALI PANEL */}
       <div
         style={{
           width: isMobileView ? "100%" : "24rem",
@@ -241,16 +289,6 @@ export default function Chat({ setToastData }) {
                   Logout
                 </Button>
               </div>
-              {friends.length > 0 && (
-                <div style={{ marginTop: "20px" }}>
-                  <h3 style={{ fontWeight: "bold" }}>Your friends:</h3>
-                  <ul>
-                    {friends.map((friend, idx) => (
-                      <li key={idx}>{friend}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           )}
 
@@ -360,7 +398,11 @@ export default function Chat({ setToastData }) {
                 }}
               >
                 <span>{friend}</span>
-                <Button variant="text" style={{ color: "gray" }}>
+                <Button
+                  variant="text"
+                  style={{ color: activeChat === friend ? "#1976d2" : "gray", fontWeight: activeChat === friend ? "bold" : "normal" }}
+                  onClick={() => setActiveChat(friend)}
+                >
                   Message
                 </Button>
               </div>
@@ -368,6 +410,87 @@ export default function Chat({ setToastData }) {
           </div>
         </div>
       </div>
+
+      {/* JOBB OLDALI CHAT PANEL */}
+      {!isMobileView && (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {activeChat ? (
+            <div
+              style={{
+                backgroundColor: "white",
+                height: "80%",
+                width: "80%",
+                borderRadius: "16px",
+                border: "1px solid #ccc",
+                display: "flex",
+                flexDirection: "column",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                padding: "24px",
+              }}
+            >
+              <h2 style={{ marginBottom: "16px", color: "#1976d2" }}>Chat with {activeChat}</h2>
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  marginBottom: "16px",
+                  background: "#f9f9f9",
+                  borderRadius: "8px",
+                  padding: "12px",
+                  border: "1px solid #eee",
+                  minHeight: "200px",
+                  maxHeight: "400px"
+                }}
+              >
+                {messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: msg.sender === currentUser.username ? "flex-end" : "flex-start",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: msg.sender === currentUser.username ? "#cce5ff" : "#ffe0b2",
+                        color: "#333",
+                        padding: "8px 12px",
+                        borderRadius: "16px",
+                        maxWidth: "60%",
+                        wordBreak: "break-word",
+                        fontSize: "16px",
+                      }}
+                    >
+                      {msg.content}
+                    </span>
+                    <span style={{ fontSize: "10px", color: "#888", marginTop: "2px" }}>
+                      {msg.sender === currentUser.username ? "You" : msg.sender} • {msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ""}
+                    </span>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={e => setNewMessage(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSendMessage(); }}
+                />
+                <Button variant="contained" color="primary" onClick={handleSendMessage}>
+                  Send
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: "#aaa", fontSize: "24px" }}>Select a friend to start chatting!</div>
+          )}
+        </div>
+      )}
 
       {!isMobileView && showOtherUsers && (
         <div
